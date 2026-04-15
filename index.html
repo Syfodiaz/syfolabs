@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Trabalhos</title>
+    <title>Controle de Trabalhos - Nuvem</title>
     <style>
+        /* (Os estilos CSS são os mesmos de antes, mantidos para manter a aparência) */
         * { box-sizing: border-box; font-family: system-ui, 'Segoe UI', sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 20px; }
         .app { max-width: 1300px; margin: 0 auto; }
@@ -51,28 +52,29 @@
         
         .status-sync { background: #dcfce7; color: #166534; padding: 6px 16px; border-radius: 40px; font-size: 13px; }
     </style>
-    <!-- Bibliotecas para PDF e Excel -->
+    <!-- Bibliotecas para PDF e Excel (mantidas) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
-<!-- Tela de Login Simples -->
+<!-- Tela de Login com Firebase -->
 <div id="loginScreen" class="login-box">
     <h2>🔐 Acesso ao Sistema</h2>
-    <p style="color:#64748b">Senha padrão: <code>admin123</code></p>
-    <input type="password" id="senhaInput" placeholder="Digite a senha" value="">
-    <button onclick="verificarSenha()">Entrar</button>
-    <p style="font-size:13px; margin-top:20px">Dados salvos localmente. Use Backup/Restaurar para sincronizar.</p>
+    <p style="color:#64748b">Entre com seu e-mail e senha</p>
+    <input type="email" id="emailInput" placeholder="E-mail" value="">
+    <input type="password" id="senhaInput" placeholder="Senha" value="">
+    <button onclick="fazerLogin()">Entrar</button>
+    <p style="font-size:13px; margin-top:20px; color: #ef4444;" id="loginErrorMsg"></p>
 </div>
 
 <!-- Sistema Principal -->
 <div id="mainApp" class="app main-content">
     <div style="display: flex; align-items: center; justify-content: space-between;">
-        <h1>📋 Registro de Trabalhos</h1>
+        <h1>📋 Registro de Trabalhos (Nuvem)</h1>
         <div>
-            <span id="syncBadge" class="status-sync">💾 Modo local</span>
+            <span id="syncBadge" class="status-sync">☁️ Conectado à nuvem</span>
             <button class="secondary" onclick="logout()" style="margin-left:15px">Sair</button>
         </div>
     </div>
@@ -120,8 +122,6 @@
             <div style="display: flex; gap: 8px;">
                 <button onclick="exportarExcel()" class="secondary">📊 Excel</button>
                 <button onclick="exportarPDF()" class="secondary">📄 PDF</button>
-                <button onclick="backupManual()" class="secondary">💾 Backup JSON</button>
-                <button onclick="restaurarBackup()" class="secondary">📂 Restaurar</button>
             </div>
         </div>
         
@@ -141,288 +141,262 @@
         </div>
     </div>
     <div class="footer-note">
-        Para usar em dois notebooks: coloque este arquivo na mesma pasta do Dropbox/OneDrive e utilize os botões Backup/Restaurar.
+        Dados salvos na nuvem do Firebase. Acesso compartilhado entre você e sua chefe.
     </div>
 </div>
 
-<script>
-    // Configuração
-    const SENHA_CORRETA = "admin123";
-    let dados = [];
+<script type="module">
+  // --- CONFIGURAÇÃO DO FIREBASE ---
+  // 1. Importe as funções que você precisa dos SDKs que você precisa
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // 2. COLE AQUI O BLOCO firebaseConfig QUE VOCÊ COPIOU DO CONSOLE DO FIREBASE
+  // ⚠️⚠️⚠️ SUBSTITUA O CONTEÚDO DESTE BLOCO PELO SEU! ⚠️⚠️⚠️
+  const firebaseConfig = {
+  apiKey: "AIzaSyAnMX4UBhjRL168I45voBfshzPAH7inhpY",
+  authDomain: "syfolab.firebaseapp.com",
+  projectId: "syfolab",
+  storageBucket: "syfolab.firebasestorage.app",
+  messagingSenderId: "78534923355",
+  appId: "1:78534923355:web:dd626ea1f1d1371a1e1b7e",
+  measurementId: "G-SK3VN5SHEY"
+};
+
+  // 3. Inicialize o Firebase
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // --- VARIÁVEIS GLOBAIS DO SISTEMA ---
+  let dados = []; // Cache local para a tabela
+  const loginScreen = document.getElementById('loginScreen');
+  const mainApp = document.getElementById('mainApp');
+  let currentUser = null;
+
+  // --- FUNÇÕES DE AUTENTICAÇÃO ---
+  window.fazerLogin = function() {
+    const email = document.getElementById('emailInput').value;
+    const password = document.getElementById('senhaInput').value;
+    const errorMsg = document.getElementById('loginErrorMsg');
+    errorMsg.textContent = '';
+
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Login bem-sucedido
+        currentUser = userCredential.user;
+        console.log('Logado como:', currentUser.email);
+        // A interface será mostrada automaticamente pelo onAuthStateChanged
+      })
+      .catch((error) => {
+        errorMsg.textContent = 'E-mail ou senha inválidos.';
+        console.error('Erro no login:', error);
+      });
+  };
+
+  window.logout = function() {
+    signOut(auth).then(() => {
+      // A interface será escondida automaticamente pelo onAuthStateChanged
+      currentUser = null;
+    }).catch((error) => {
+      console.error('Erro ao sair:', error);
+    });
+  };
+
+  // Observador de estado da autenticação: decide se mostra login ou app
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // Usuário está logado
+      currentUser = user;
+      loginScreen.style.display = 'none';
+      mainApp.style.display = 'block';
+      carregarDadosDoFirestore(); // Carrega os dados da nuvem
+    } else {
+      // Usuário deslogado
+      currentUser = null;
+      loginScreen.style.display = 'block';
+      mainApp.style.display = 'none';
+      document.getElementById('emailInput').value = '';
+      document.getElementById('senhaInput').value = '';
+    }
+  });
+
+  // --- FUNÇÕES DO FIRESTORE (CRUD) ---
+  async function carregarDadosDoFirestore() {
+    const q = query(collection(db, "trabalhos"), orderBy("data", "desc"));
+    const querySnapshot = await getDocs(q);
+    dados = [];
+    querySnapshot.forEach((doc) => {
+      // Inclui o ID do documento no objeto para operações de edição/exclusão
+      dados.push({ id: doc.id, ...doc.data() });
+    });
+    atualizarTabela();
+    popularFiltroMeses();
+    document.getElementById('syncBadge').innerHTML = `☁️ ${dados.length} registros na nuvem`;
+  }
+
+  window.adicionarRegistro = async function() {
+    const cliente = document.getElementById('clienteInput').value.trim();
+    const paciente = document.getElementById('pacienteInput').value.trim();
+    const data = document.getElementById('dataInput').value;
+    const trabalho = document.getElementById('trabalhoInput').value.trim();
+    const obs = document.getElementById('obsInput').value.trim();
     
-    // Elementos
-    const loginScreen = document.getElementById('loginScreen');
-    const mainApp = document.getElementById('mainApp');
-    
-    // Inicialização
-    window.onload = function() {
-        const hoje = new Date().toISOString().split('T')[0];
-        document.getElementById('dataInput').value = hoje;
-        
-        if(localStorage.getItem('logado') === 'true') {
-            mostrarApp();
-        }
-    };
-    
-    function verificarSenha() {
-        const senha = document.getElementById('senhaInput').value;
-        if(senha === SENHA_CORRETA) {
-            localStorage.setItem('logado', 'true');
-            mostrarApp();
-        } else {
-            alert('Senha incorreta. Tente admin123');
-        }
+    if(!cliente || !paciente || !data || !trabalho) {
+      alert('Preencha os campos obrigatórios: Cliente, Paciente, Data e Trabalho.');
+      return;
     }
     
-    function logout() {
-        localStorage.removeItem('logado');
-        loginScreen.style.display = 'block';
-        mainApp.style.display = 'none';
-        document.getElementById('senhaInput').value = '';
+    const registro = { cliente, paciente, data, trabalho, obs };
+    const editId = document.getElementById('editId').value;
+    
+    if(editId) {
+      // Edição
+      const docRef = doc(db, "trabalhos", editId);
+      await updateDoc(docRef, registro);
+      document.getElementById('editId').value = '';
+    } else {
+      // Novo
+      await addDoc(collection(db, "trabalhos"), registro);
     }
     
-    async function mostrarApp() {
-        loginScreen.style.display = 'none';
-        mainApp.style.display = 'block';
-        await carregarDados();
-        atualizarTabela();
-        popularFiltroMeses();
+    limparForm();
+    await carregarDadosDoFirestore(); // Recarrega a lista da nuvem
+  };
+
+  window.editarRegistro = function(id) {
+    const item = dados.find(d => d.id === id);
+    if(!item) return;
+    document.getElementById('clienteInput').value = item.cliente;
+    document.getElementById('pacienteInput').value = item.paciente;
+    document.getElementById('dataInput').value = item.data;
+    document.getElementById('trabalhoInput').value = item.trabalho;
+    document.getElementById('obsInput').value = item.obs || '';
+    document.getElementById('editId').value = id;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  window.excluirRegistro = async function(id) {
+    if(confirm('Excluir este registro?')) {
+      const docRef = doc(db, "trabalhos", id);
+      await deleteDoc(docRef);
+      await carregarDadosDoFirestore();
     }
+  };
+
+  function limparForm() {
+    document.getElementById('clienteInput').value = '';
+    document.getElementById('pacienteInput').value = '';
+    document.getElementById('dataInput').value = new Date().toISOString().split('T')[0];
+    document.getElementById('trabalhoInput').value = '';
+    document.getElementById('obsInput').value = '';
+    document.getElementById('editId').value = '';
+  }
+
+  // --- FUNÇÕES DE EXIBIÇÃO E FILTROS (MANTIDAS) ---
+  function formatarDataISO(dataStr) {
+    if(!dataStr) return '';
+    const partes = dataStr.split('-');
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  }
+  
+  window.filtrarTabela = function() {
+    const termo = document.getElementById('searchInput').value.toLowerCase();
+    const mesSelecionado = document.getElementById('mesFiltro').value;
     
-    // ---------------- GERENCIAMENTO DE DADOS ----------------
-    async function carregarDados() {
-        try {
-            const response = await fetch('dados.json');
-            if (response.ok) {
-                const jsonData = await response.json();
-                dados = jsonData;
-                localStorage.setItem('cacheTrabalhos', JSON.stringify(dados));
-            } else {
-                const cache = localStorage.getItem('cacheTrabalhos');
-                if (cache) dados = JSON.parse(cache);
-                else dados = [];
-            }
-        } catch(e) {
-            const cache = localStorage.getItem('cacheTrabalhos');
-            if (cache) dados = JSON.parse(cache);
-            else dados = [];
-        }
-        dados.forEach((item, idx) => { if(!item.id) item.id = crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+idx; });
-        salvarCache();
-    }
+    let filtrados = dados.filter(item => {
+      const texto = `${item.cliente} ${item.paciente} ${item.trabalho} ${item.obs}`.toLowerCase();
+      const matchTermo = !termo || texto.includes(termo);
+      const matchMes = !mesSelecionado || item.data.startsWith(mesSelecionado);
+      return matchTermo && matchMes;
+    });
     
-    function salvarCache() {
-        localStorage.setItem('cacheTrabalhos', JSON.stringify(dados));
-        document.getElementById('syncBadge').innerHTML = `💾 ${dados.length} registros salvos localmente`;
-    }
+    const tbody = document.getElementById('tabelaBody');
+    tbody.innerHTML = '';
     
-    function backupManual() {
-        const jsonStr = JSON.stringify(dados, null, 2);
-        const blob = new Blob([jsonStr], {type: 'application/json'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'dados.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        alert('Arquivo dados.json baixado! Coloque-o na mesma pasta do sistema no outro notebook e use "Restaurar".');
-    }
+    filtrados.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${formatarDataISO(item.data)}</td>
+        <td>${item.cliente}</td>
+        <td>${item.paciente}</td>
+        <td>${item.trabalho}</td>
+        <td style="max-width:250px">${item.obs || ''}</td>
+        <td class="acoes-td">
+          <button class="secondary" onclick="editarRegistro('${item.id}')">✏️</button>
+          <button class="danger" onclick="excluirRegistro('${item.id}')">🗑️</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
     
-    function restaurarBackup() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json,application/json';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const novosDados = JSON.parse(ev.target.result);
-                    if(Array.isArray(novosDados)) {
-                        dados = novosDados;
-                        salvarCache();
-                        atualizarTabela();
-                        popularFiltroMeses();
-                        alert('Dados restaurados com sucesso!');
-                    } else throw new Error('Formato inválido');
-                } catch(ex) {
-                    alert('Erro ao ler arquivo JSON.');
-                }
-            };
-            reader.readAsText(file);
-        };
-        input.click();
-    }
+    document.getElementById('resumoContador').innerHTML = `
+      📋 Total de registros exibidos: ${filtrados.length} / ${dados.length} totais
+    `;
+  };
+  
+  function atualizarTabela() {
+    filtrarTabela();
+  }
+  
+  function popularFiltroMeses() {
+    const select = document.getElementById('mesFiltro');
+    const mesesSet = new Set();
+    dados.forEach(d => { if(d.data) mesesSet.add(d.data.substring(0,7)); });
+    const meses = Array.from(mesesSet).sort().reverse();
     
-    // ---------------- CRUD ----------------
-    function adicionarRegistro() {
-        const cliente = document.getElementById('clienteInput').value.trim();
-        const paciente = document.getElementById('pacienteInput').value.trim();
-        const data = document.getElementById('dataInput').value;
-        const trabalho = document.getElementById('trabalhoInput').value.trim();
-        const obs = document.getElementById('obsInput').value.trim();
-        
-        if(!cliente || !paciente || !data || !trabalho) {
-            alert('Preencha os campos obrigatórios: Cliente, Paciente, Data e Trabalho.');
-            return;
-        }
-        
-        const editId = document.getElementById('editId').value;
-        if(editId) {
-            const index = dados.findIndex(d => d.id === editId);
-            if(index !== -1) {
-                dados[index] = { ...dados[index], cliente, paciente, data, trabalho, obs };
-            }
-            document.getElementById('editId').value = '';
-        } else {
-            const novo = {
-                id: crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random(),
-                cliente, paciente, data, trabalho, obs
-            };
-            dados.push(novo);
-        }
-        
-        salvarCache();
-        limparForm();
-        atualizarTabela();
-        popularFiltroMeses();
-    }
+    select.innerHTML = '<option value="">Todos os meses</option>';
+    meses.forEach(m => {
+      const option = document.createElement('option');
+      option.value = m;
+      const [ano, mes] = m.split('-');
+      option.textContent = `${mes}/${ano}`;
+      select.appendChild(option);
+    });
+  }
+  
+  // --- EXPORTAÇÕES (MANTIDAS) ---
+  window.exportarExcel = function() {
+    const wsData = dados.map(d => ({
+      'Data': formatarDataISO(d.data),
+      'Cliente': d.cliente,
+      'Paciente': d.paciente,
+      'Trabalho': d.trabalho,
+      'Observações': d.obs || ''
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Trabalhos");
+    XLSX.writeFile(wb, `trabalhos_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+  
+  window.exportarPDF = function() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Relatório de Trabalhos", 14, 20);
+    doc.setFontSize(11);
     
-    function limparForm() {
-        document.getElementById('clienteInput').value = '';
-        document.getElementById('pacienteInput').value = '';
-        document.getElementById('dataInput').value = new Date().toISOString().split('T')[0];
-        document.getElementById('trabalhoInput').value = '';
-        document.getElementById('obsInput').value = '';
-        document.getElementById('editId').value = '';
-    }
+    const body = dados.map(d => [
+      formatarDataISO(d.data),
+      d.cliente,
+      d.paciente,
+      d.trabalho,
+      d.obs || ''
+    ]);
     
-    function editarRegistro(id) {
-        const item = dados.find(d => d.id === id);
-        if(!item) return;
-        document.getElementById('clienteInput').value = item.cliente;
-        document.getElementById('pacienteInput').value = item.paciente;
-        document.getElementById('dataInput').value = item.data;
-        document.getElementById('trabalhoInput').value = item.trabalho;
-        document.getElementById('obsInput').value = item.obs || '';
-        document.getElementById('editId').value = id;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    doc.autoTable({
+      head: [['Data', 'Cliente', 'Paciente', 'Trabalho', 'Observações']],
+      body: body,
+      startY: 30,
+      styles: { fontSize: 9 },
+      columnStyles: { 4: { cellWidth: 50 } }
+    });
     
-    function excluirRegistro(id) {
-        if(confirm('Excluir este registro?')) {
-            dados = dados.filter(d => d.id !== id);
-            salvarCache();
-            atualizarTabela();
-            popularFiltroMeses();
-        }
-    }
-    
-    // ---------------- EXIBIÇÃO E FILTROS ----------------
-    function formatarDataISO(dataStr) {
-        if(!dataStr) return '';
-        const partes = dataStr.split('-');
-        return `${partes[2]}/${partes[1]}/${partes[0]}`;
-    }
-    
-    function filtrarTabela() {
-        const termo = document.getElementById('searchInput').value.toLowerCase();
-        const mesSelecionado = document.getElementById('mesFiltro').value;
-        
-        let filtrados = dados.filter(item => {
-            const texto = `${item.cliente} ${item.paciente} ${item.trabalho} ${item.obs}`.toLowerCase();
-            const matchTermo = !termo || texto.includes(termo);
-            const matchMes = !mesSelecionado || item.data.startsWith(mesSelecionado);
-            return matchTermo && matchMes;
-        });
-        
-        filtrados.sort((a,b) => b.data.localeCompare(a.data));
-        
-        const tbody = document.getElementById('tabelaBody');
-        tbody.innerHTML = '';
-        
-        filtrados.forEach(item => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${formatarDataISO(item.data)}</td>
-                <td>${item.cliente}</td>
-                <td>${item.paciente}</td>
-                <td>${item.trabalho}</td>
-                <td style="max-width:250px">${item.obs || ''}</td>
-                <td class="acoes-td">
-                    <button class="secondary" onclick="editarRegistro('${item.id}')">✏️</button>
-                    <button class="danger" onclick="excluirRegistro('${item.id}')">🗑️</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-        
-        document.getElementById('resumoContador').innerHTML = `
-            📋 Total de registros exibidos: ${filtrados.length} / ${dados.length} totais
-        `;
-    }
-    
-    function atualizarTabela() {
-        filtrarTabela();
-    }
-    
-    function popularFiltroMeses() {
-        const select = document.getElementById('mesFiltro');
-        const mesesSet = new Set();
-        dados.forEach(d => { if(d.data) mesesSet.add(d.data.substring(0,7)); });
-        const meses = Array.from(mesesSet).sort().reverse();
-        
-        select.innerHTML = '<option value="">Todos os meses</option>';
-        meses.forEach(m => {
-            const option = document.createElement('option');
-            option.value = m;
-            const [ano, mes] = m.split('-');
-            option.textContent = `${mes}/${ano}`;
-            select.appendChild(option);
-        });
-    }
-    
-    // ---------------- EXPORTAÇÕES (SEM VALORES) ----------------
-    function exportarExcel() {
-        const wsData = dados.map(d => ({
-            'Data': formatarDataISO(d.data),
-            'Cliente': d.cliente,
-            'Paciente': d.paciente,
-            'Trabalho': d.trabalho,
-            'Observações': d.obs || ''
-        }));
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(wsData);
-        XLSX.utils.book_append_sheet(wb, ws, "Trabalhos");
-        XLSX.writeFile(wb, `trabalhos_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
-    
-    function exportarPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.setFontSize(16);
-        doc.text("Relatório de Trabalhos", 14, 20);
-        doc.setFontSize(11);
-        
-        const body = dados.map(d => [
-            formatarDataISO(d.data),
-            d.cliente,
-            d.paciente,
-            d.trabalho,
-            d.obs || ''
-        ]);
-        
-        doc.autoTable({
-            head: [['Data', 'Cliente', 'Paciente', 'Trabalho', 'Observações']],
-            body: body,
-            startY: 30,
-            styles: { fontSize: 9 },
-            columnStyles: { 4: { cellWidth: 50 } }
-        });
-        
-        doc.save(`relatorio_${new Date().toISOString().slice(0,10)}.pdf`);
-    }
+    doc.save(`relatorio_${new Date().toISOString().slice(0,10)}.pdf`);
+  };
+
 </script>
 </body>
 </html>
