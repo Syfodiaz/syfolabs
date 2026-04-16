@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Trabalhos - Nuvem</title>
     <style>
-        /* Estilos mantidos */
         * { box-sizing: border-box; font-family: system-ui, 'Segoe UI', sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 20px; }
         .app { max-width: 1300px; margin: 0 auto; }
@@ -49,13 +48,13 @@
 </head>
 <body>
 
-<!-- Tela de Login -->
+<!-- Tela de Login com Nome de Usuário -->
 <div id="loginScreen" class="login-box">
     <h2>🔐 Acesso ao Sistema</h2>
-    <p style="color:#64748b">Entre com seu e-mail e senha</p>
-    <input type="email" id="emailInput" placeholder="E-mail" value="">
+    <p style="color:#64748b">Entre com seu usuário e senha</p>
+    <input type="text" id="usernameInput" placeholder="Usuário" value="">
     <input type="password" id="senhaInput" placeholder="Senha" value="">
-    <button onclick="fazerLogin()">Entrar</button>
+    <button onclick="fazerLogin()">Acessar</button>
     <div id="loginErrorMsg"></div>
     <div id="resetSuccessMsg"></div>
     <div style="display: flex; justify-content: space-between; margin-top: 10px;">
@@ -65,7 +64,7 @@
     <p style="font-size:13px; margin-top:20px; color:#64748b;">Dados salvos na nuvem do Firebase.</p>
 </div>
 
-<!-- Sistema Principal -->
+<!-- Sistema Principal (igual) -->
 <div id="mainApp" class="app main-content">
     <div style="display: flex; align-items: center; justify-content: space-between;">
         <h1>📋 Registro de Trabalhos (Nuvem)</h1>
@@ -75,7 +74,6 @@
         </div>
     </div>
     
-    <!-- Formulário -->
     <div class="card">
         <h3 style="margin-top:0">➕ Novo Registro</h3>
         <div class="form-grid">
@@ -89,7 +87,6 @@
         <input type="hidden" id="editId" value="">
     </div>
     
-    <!-- Lista e Ferramentas -->
     <div class="card">
         <div class="toolbar">
             <div>
@@ -113,7 +110,7 @@
 </div>
 
 <script type="module">
-  // --- CONFIGURAÇÃO DO FIREBASE (SUAS CHAVES REAIS) ---
+  // --- CONFIGURAÇÃO DO FIREBASE (SUAS CHAVES) ---
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { 
     getAuth, 
@@ -132,10 +129,11 @@
     updateDoc, 
     deleteDoc, 
     query, 
-    orderBy 
+    orderBy,
+    setDoc,
+    getDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // Configuração real do seu projeto Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyAnMX4UBhjRL168I45voBfshzPAH7inhpY",
     authDomain: "syfolab.firebaseapp.com",
@@ -146,68 +144,117 @@
     measurementId: "G-SK3VN5SHEY"
   };
 
-  // Inicializa o Firebase
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
-  // Obs: measurementId é opcional e não será usado para analytics neste código.
 
-  // --- VARIÁVEIS GLOBAIS ---
   let dados = [];
   const loginScreen = document.getElementById('loginScreen');
   const mainApp = document.getElementById('mainApp');
   let currentUser = null;
 
-  // --- FUNÇÕES DE AUTENTICAÇÃO ---
-  window.fazerLogin = function() {
-    const email = document.getElementById('emailInput').value.trim();
+  // --- FUNÇÃO PARA BUSCAR E-MAIL A PARTIR DO NOME DE USUÁRIO ---
+  async function getEmailFromUsername(username) {
+    const userDocRef = doc(db, "usuarios", username);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+      return userDoc.data().email;
+    } else {
+      throw new Error("Usuário não encontrado.");
+    }
+  }
+
+  // --- LOGIN COM NOME DE USUÁRIO ---
+  window.fazerLogin = async function() {
+    const username = document.getElementById('usernameInput').value.trim();
     const password = document.getElementById('senhaInput').value;
     const errorMsg = document.getElementById('loginErrorMsg');
     errorMsg.textContent = '';
 
-    signInWithEmailAndPassword(auth, email, password)
-      .catch((error) => {
-        errorMsg.textContent = 'E-mail ou senha inválidos.';
-        console.error('Erro no login:', error);
-      });
-  };
-
-  window.mostrarCriarConta = function() {
-    const email = document.getElementById('emailInput').value.trim();
-    const password = document.getElementById('senhaInput').value;
-    if (!email || !password) {
-      alert('Preencha e-mail e senha para criar uma conta.');
+    if (!username || !password) {
+      errorMsg.textContent = 'Preencha usuário e senha.';
       return;
     }
-    if (password.length < 6) {
+
+    try {
+      const email = await getEmailFromUsername(username);
+      await signInWithEmailAndPassword(auth, email, password);
+      // Login bem-sucedido, onAuthStateChanged redireciona
+    } catch (error) {
+      console.error('Erro no login:', error);
+      if (error.message.includes('Usuário não encontrado')) {
+        errorMsg.textContent = 'Usuário não encontrado.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMsg.textContent = 'Senha incorreta.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMsg.textContent = 'E-mail associado inválido.';
+      } else {
+        errorMsg.textContent = 'Erro ao fazer login. Verifique os dados.';
+      }
+    }
+  };
+
+  // --- CRIAR NOVA CONTA COM NOME DE USUÁRIO E E-MAIL ---
+  window.mostrarCriarConta = function() {
+    // Exibe um pequeno formulário para criar conta
+    const username = prompt("Escolha um nome de usuário (ex: jupereira):");
+    if (!username) return;
+    const email = prompt("Digite um e-mail válido (não aparecerá no login, é só para recuperação de senha):");
+    if (!email) return;
+    const password = prompt("Digite uma senha (mínimo 6 caracteres):");
+    if (!password || password.length < 6) {
       alert('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        alert('Conta criada com sucesso! Você já está logado.');
-      })
-      .catch((error) => {
-        document.getElementById('loginErrorMsg').textContent = 'Erro ao criar conta: ' + error.message;
-      });
+
+    // Primeiro, verifica se o nome de usuário já existe
+    getDoc(doc(db, "usuarios", username)).then(async (docSnap) => {
+      if (docSnap.exists()) {
+        alert('Este nome de usuário já está em uso. Escolha outro.');
+        return;
+      }
+      
+      try {
+        // Cria a conta no Firebase Authentication
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Salva o mapeamento no Firestore
+        await setDoc(doc(db, "usuarios", username), {
+          email: email
+        });
+        alert('Conta criada com sucesso! Você será redirecionado.');
+        // Força login com o novo usuário
+        document.getElementById('usernameInput').value = username;
+        document.getElementById('senhaInput').value = password;
+        fazerLogin();
+      } catch (error) {
+        alert('Erro ao criar conta: ' + error.message);
+      }
+    });
   };
 
-  window.resetarSenha = function() {
-    const email = document.getElementById('emailInput').value.trim();
-    if (!email) {
-      alert('Digite seu e-mail no campo acima para receber o link de redefinição.');
+  // --- RECUPERAR SENHA (USA O E-MAIL ASSOCIADO AO USUÁRIO) ---
+  window.resetarSenha = async function() {
+    const username = document.getElementById('usernameInput').value.trim();
+    if (!username) {
+      alert('Digite seu nome de usuário no campo acima para recuperar a senha.');
       return;
     }
     const resetMsg = document.getElementById('resetSuccessMsg');
-    sendPasswordResetEmail(auth, email)
-      .then(() => {
-        resetMsg.textContent = '✅ E-mail de redefinição enviado! Verifique sua caixa de entrada.';
-        document.getElementById('loginErrorMsg').textContent = '';
-      })
-      .catch((error) => {
-        document.getElementById('loginErrorMsg').textContent = 'Erro ao enviar e-mail: ' + error.message;
-        resetMsg.textContent = '';
-      });
+    const errorMsg = document.getElementById('loginErrorMsg');
+    resetMsg.textContent = '';
+    errorMsg.textContent = '';
+
+    try {
+      const email = await getEmailFromUsername(username);
+      await sendPasswordResetEmail(auth, email);
+      resetMsg.textContent = '✅ E-mail de redefinição enviado! Verifique a caixa de entrada do e-mail associado.';
+    } catch (error) {
+      if (error.message.includes('Usuário não encontrado')) {
+        errorMsg.textContent = 'Usuário não encontrado.';
+      } else {
+        errorMsg.textContent = 'Erro ao enviar e-mail: ' + error.message;
+      }
+    }
   };
 
   window.logout = function() {
@@ -228,12 +275,12 @@
       currentUser = null;
       loginScreen.style.display = 'block';
       mainApp.style.display = 'none';
-      document.getElementById('emailInput').value = '';
+      document.getElementById('usernameInput').value = '';
       document.getElementById('senhaInput').value = '';
     }
   });
 
-  // --- FIRESTORE CRUD ---
+  // --- CRUD (mantido igual) ---
   async function carregarDadosDoFirestore() {
     const q = query(collection(db, "trabalhos"), orderBy("data", "desc"));
     const querySnapshot = await getDocs(q);
@@ -302,7 +349,6 @@
     document.getElementById('editId').value = '';
   }
 
-  // --- FILTROS E EXIBIÇÃO ---
   function formatarDataISO(dataStr) {
     if(!dataStr) return '';
     const partes = dataStr.split('-');
@@ -361,7 +407,6 @@
     });
   }
   
-  // --- EXPORTAÇÕES ---
   window.exportarExcel = function() {
     const wsData = dados.map(d => ({
       'Data': formatarDataISO(d.data),
