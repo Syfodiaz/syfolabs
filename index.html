@@ -3,39 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syfo Labs</title>
+    <title>Sistema SyfoLabs</title>
     <style>
         * { box-sizing: border-box; font-family: system-ui, 'Segoe UI', sans-serif; }
         
         /* === FUNDO DE TELA INTEIRA COM A IMAGEM === */
         body { 
-            background: url('https://s2-oglobo.glbimg.com/...') no-repeat center center fixed;
+            background: url('https://s2-oglobo.glbimg.com/tAp0RBrSllUFUYnn-S9JnuUXIMQ=/0x15:2274x1263/600x0/smart/filters:gifv():strip_icc()/i.s3.glbimg.com/v1/AUTH_da025474c0c44edd99332dddb09cabe8/internal_photos/bs/2022/b/d/dVuqvfRCWZdifALapRIg/nicolas-cage.jpg') no-repeat center center fixed;
             background-size: cover;
             margin: 0; 
-            padding: 30px;            /* Espaçamento da borda da tela */
-        min-height: 100vh;
-        display: flex;
-        align-items: flex-start;    /* Cola no rodapé */
-        justify-content: flex-start; /* Cola na direita */
-         }
+            padding: 2cm 0 0 2cm;  /* 2cm do topo e da esquerda */
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;     /* Alinha no topo */
+            justify-content: flex-start; /* Alinha à esquerda */
+        }
         .app { max-width: 1300px; margin: 0 auto; }
         
-        /* === CAIXA DE LOGIN COM FUNDO CLARO SEMITRANSPARENTE === */
+        /* === CAIXA DE LOGIN SEMITRANSPARENTE === */
         .login-box {
-            background: rgba(255, 255, 255, 0.4);
-            backdrop-filter: blur(5px);
+            background: rgba(255, 255, 255, 0.7);
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.15);
             max-width: 400px;
-            margin: 0 auto;
+            width: 100%;
             text-align: center;
         }
         
         .login-box input { width: 100%; padding: 14px; margin: 15px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; background: white; }
         .login-box button { background: #2c3e50; color: white; border: none; padding: 14px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
-        .login-box .link-btn { background: none; color: #3b82f6; text-decoration: underline; padding: 5px; width: auto; margin: 5px; font-weight: normal; }
-        .login-box .link-btn:hover { background: none; color: #1e4bd2; }
+        .login-box .link-btn { background: none; color: #1e3a8a; text-decoration: underline; padding: 5px; width: auto; margin: 5px; font-weight: normal; border: none; box-shadow: none; }
+        .login-box .link-btn:hover { background: none; color: #0f2c5e; }
         
         .main-content { display: none; }
         h1 { color: #1e293b; font-weight: 600; display: flex; align-items: center; gap: 10px; }
@@ -73,7 +72,7 @@
 <!-- Tela de Login com Nome de Usuário -->
 <div id="loginScreen" class="login-box">
     <h2>🔐 Acesso ao Sistema</h2>
-    <p style="color:#2c3e50; font-weight: 500;">Entre com seu usuário e senha</p>
+    <p style="color:#1e293b; font-weight: 500;">Entre com seu usuário e senha</p>
     <input type="text" id="usernameInput" placeholder="Usuário" value="">
     <input type="password" id="senhaInput" placeholder="Senha" value="">
     <button onclick="fazerLogin()">Acessar</button>
@@ -83,7 +82,7 @@
         <button class="link-btn" onclick="mostrarCriarConta()">➕ Criar nova conta</button>
         <button class="link-btn" onclick="resetarSenha()">🔑 Esqueci minha senha</button>
     </div>
-    <p style="font-size:13px; margin-top:20px; color:#2c3e50;">Dados salvos na nuvem do Firebase.</p>
+    <p style="font-size:13px; margin-top:20px; color:#1e293b;">Dados salvos na nuvem do Firebase.</p>
 </div>
 
 <!-- Sistema Principal (igual) -->
