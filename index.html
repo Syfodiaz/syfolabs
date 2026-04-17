@@ -9,20 +9,20 @@
         
         /* === FUNDO DE TELA INTEIRA COM A IMAGEM === */
         body { 
-            background: url('https://s2-oglobo.glbimg.com/tAp0RBrSllUFUYnn-S9JnuUXIMQ=/0x15:2274x1263/600x0/smart/filters:gifv():strip_icc()/i.s3.glbimg.com/v1/AUTH_da025474c0c44edd99332dddb09cabe8/internal_photos/bs/2022/b/d/dVuqvfRCWZdifALapRIg/nicolas-cage.jpg') no-repeat center center fixed;
+            background: url('https://s2-oglobo.glbimg.com/...') no-repeat center center fixed;
             background-size: cover;
             margin: 0; 
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+            padding: 30px;            /* Espaçamento da borda da tela */
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;    /* Cola no rodapé */
+        justify-content: flex-start; /* Cola na direita */
+         }
         .app { max-width: 1300px; margin: 0 auto; }
         
         /* === CAIXA DE LOGIN COM FUNDO CLARO SEMITRANSPARENTE === */
         .login-box {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.4);
             backdrop-filter: blur(5px);
             padding: 30px;
             border-radius: 16px;
